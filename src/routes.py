@@ -7,6 +7,7 @@ from src.db.schemas import EventRead, EventCreate, LoadTickets
 from sqlalchemy.exc import IntegrityError
 from redis.asyncio import Redis
 from src.redis.client import redis_manager, get_redis_client
+from src.worker.celery_app import process_order
 
 buying_router = APIRouter()
 
@@ -78,8 +79,8 @@ async def atomic_buy(event_id: int):
         raise HTTPException(status_code=500, detail=f"Redis Error: {str(e)}")
 
     if result == 1:
-        # TODO (Phase 4): Send task to Celery to write to Postgres
-        return {"status": "purchased", "message": "Ticket reserved!"}
+        process_order.delay(event_id, 1)
+        return {"status": "purchased", "message": "Ticket reserved! Processing payment..."}
     
     elif result == 0:
         raise HTTPException(status_code=400, detail="Sold out")
