@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy import select
 from src.db.session import AsyncSession, get_db
 from src.db.models import Event
@@ -71,16 +71,25 @@ async def naive_buy(event_id:int, db:AsyncSession = Depends(get_db)):
     return event
 
 @buying_router.post("/atomic-buy/{event_id}", status_code=status.HTTP_200_OK)
-async def atomic_buy(event_id: int):
+async def atomic_buy(event_id: int, x_idempotency_key: str = Header(..., alias="X-Idempotency-Key")):
+
     redis_key = f"event:{event_id}:tickets"
+    idempotency_key = f"idempotency:{x_idempotency_key}"
+
     try:
-        result = await redis_manager.buy_ticket_script(keys=[redis_key])
+        result = await redis_manager.buy_ticket_script(keys=[redis_key, idempotency_key])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Redis Error: {str(e)}")
 
-    if result == 1:
+    if result == 2:
+        # Idempotent Replay: User already bought it, just remind them.
+        # Ideally, you'd fetch the actual booking status, but for now:
+        return {"status": "purchased", "message": "Ticket already reserved (Idempotent)"}
+    
+    elif result == 1:
         process_order.delay(event_id, 1)
         return {"status": "purchased", "message": "Ticket reserved! Processing payment..."}
+    
     
     elif result == 0:
         raise HTTPException(status_code=400, detail="Sold out")
