@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>AtomicTickets // Systems Ops</title>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;800&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+            rel="stylesheet"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <style>
+            :root {
+                --bg: #050505;
+                --surface: #0e0e0e;
+                --surface-active: #1a1a1a;
+                --border: #222;
+                --border-highlight: #444;
+
+                --text-primary: #ededed;
+                --text-secondary: #888;
+                --text-mono: #666;
+
+                --accent: #2563eb;
+                --accent-glow: rgba(37, 99, 235, 0.2);
+                --success: #10b981;
+                --danger: #ef4444;
+                --warning: #f59e0b;
+
+                --font-main: "Inter", system-ui, sans-serif;
+                --font-code: "IBM Plex Mono", monospace;
+
+                --radius: 6px;
+            }
+
+            * {
+                box-sizing: border-box;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            body {
+                background-color: var(--bg);
+                background-image: linear-gradient(
+                        rgba(255, 255, 255, 0.03) 1px,
+                        transparent 1px
+                    ),
+                    linear-gradient(
+                        90deg,
+                        rgba(255, 255, 255, 0.03) 1px,
+                        transparent 1px
+                    );
+                background-size: 40px 40px;
+                color: var(--text-primary);
+                font-family: var(--font-main);
+                margin: 0;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            /* --- NAVBAR --- */
+            nav {
+                height: 64px;
+                border-bottom: 1px solid var(--border);
+                background: rgba(5, 5, 5, 0.9);
+                backdrop-filter: blur(10px);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 24px;
+                z-index: 100;
+            }
+            .brand {
+                font-weight: 800;
+                font-size: 1.1rem;
+                letter-spacing: -0.02em;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .brand i {
+                color: var(--text-primary);
+            }
+            .status-pill {
+                font-family: var(--font-code);
+                font-size: 0.7rem;
+                padding: 4px 8px;
+                border-radius: 4px;
+                background: var(--surface-active);
+                border: 1px solid var(--border);
+                color: var(--success);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .status-dot {
+                width: 6px;
+                height: 6px;
+                background: currentColor;
+                border-radius: 50%;
+                box-shadow: 0 0 8px currentColor;
+            }
+
+            /* --- LAYOUT --- */
+            main {
+                flex: 1;
+                display: grid;
+                grid-template-columns: 350px 1fr;
+                height: calc(100vh - 64px);
+            }
+
+            aside {
+                background: var(--surface);
+                border-right: 1px solid var(--border);
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 32px;
+                overflow-y: auto;
+            }
+
+            .workspace {
+                padding: 32px;
+                display: grid;
+                grid-template-rows: auto 1fr;
+                gap: 24px;
+                overflow-y: auto;
+            }
+
+            /* --- UI COMPONENTS --- */
+            .section-header {
+                font-family: var(--font-code);
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                color: var(--text-secondary);
+                margin-bottom: 12px;
+                letter-spacing: 0.05em;
+            }
+
+            .input-group {
+                display: flex;
+                gap: 8px;
+            }
+
+            input,
+            select {
+                background: #000;
+                border: 1px solid var(--border);
+                color: var(--text-primary);
+                padding: 10px 12px;
+                border-radius: var(--radius);
+                font-family: var(--font-code);
+                font-size: 0.85rem;
+                width: 100%;
+                transition: border-color 0.2s;
+            }
+            input:focus,
+            select:focus {
+                outline: none;
+                border-color: var(--text-secondary);
+            }
+
+            button {
+                cursor: pointer;
+                padding: 10px 16px;
+                border-radius: var(--radius);
+                font-weight: 600;
+                font-size: 0.85rem;
+                border: none;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .btn-primary {
+                background: var(--text-primary);
+                color: #000;
+            }
+            .btn-primary:hover {
+                background: #fff;
+                transform: translateY(-1px);
+            }
+
+            .btn-ghost {
+                background: transparent;
+                border: 1px solid var(--border);
+                color: var(--text-secondary);
+            }
+            .btn-ghost:hover {
+                border-color: var(--text-primary);
+                color: var(--text-primary);
+            }
+
+            .btn-danger {
+                background: rgba(239, 68, 68, 0.1);
+                color: var(--danger);
+                border: 1px solid rgba(239, 68, 68, 0.2);
+            }
+            .btn-danger:hover {
+                background: rgba(239, 68, 68, 0.2);
+            }
+
+            .btn-blast {
+                background: var(--accent);
+                color: white;
+                width: 100%;
+                box-shadow: 0 0 20px var(--accent-glow);
+            }
+            .btn-blast:hover {
+                filter: brightness(1.2);
+            }
+            .btn-blast:active {
+                transform: scale(0.98);
+            }
+
+            /* --- MODE TOGGLE --- */
+            .mode-switch {
+                display: flex;
+                background: #000;
+                padding: 4px;
+                border-radius: var(--radius);
+                border: 1px solid var(--border);
+            }
+            .mode-opt {
+                flex: 1;
+                text-align: center;
+                padding: 8px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                border-radius: 4px;
+                cursor: pointer;
+                color: var(--text-mono);
+                transition: 0.2s;
+            }
+            .mode-opt.active {
+                background: var(--surface-active);
+                color: var(--text-primary);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            }
+            .mode-opt.active.safe {
+                color: var(--success);
+            }
+            .mode-opt.active.danger {
+                color: var(--danger);
+            }
+
+            /* --- STATS CARD --- */
+            .glass-panel {
+                background: rgba(14, 14, 14, 0.7);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 24px;
+                position: relative;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .stat-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+            }
+            .stat-value {
+                font-size: 4rem;
+                font-weight: 800;
+                line-height: 1;
+                letter-spacing: -2px;
+                font-variant-numeric: tabular-nums;
+            }
+            .stat-label {
+                font-family: var(--font-code);
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                margin-top: 8px;
+            }
+
+            /* --- TERMINAL --- */
+            .terminal {
+                background: #000;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-family: var(--font-code);
+                font-size: 0.75rem;
+                padding: 16px;
+                flex: 1;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .log-entry {
+                display: flex;
+                gap: 12px;
+                padding-bottom: 4px;
+                border-bottom: 1px solid #111;
+            }
+            .log-ts {
+                color: var(--text-mono);
+                min-width: 60px;
+                user-select: none;
+            }
+            .log-msg {
+                color: var(--text-secondary);
+            }
+            .log-msg.succ {
+                color: var(--success);
+            }
+            .log-msg.err {
+                color: var(--danger);
+            }
+
+            /* --- RESPONSIVE --- */
+            @media (max-width: 1000px) {
+                main {
+                    grid-template-columns: 1fr;
+                    grid-template-rows: auto 1fr;
+                    height: auto;
+                }
+                aside {
+                    border-right: none;
+                    border-bottom: 1px solid var(--border);
+                    height: auto;
+                }
+                body {
+                    overflow-y: auto;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <nav>
+            <div class="brand"><i class="fas fa-cube"></i> AtomicTickets</div>
+            <div class="status-pill">
+                <div class="status-dot"></div>
+                SYSTEM ONLINE
+            </div>
+        </nav>
+
+        <main>
+            <aside>
+                <div>
+                    <div class="section-header">01 // Deployment</div>
+                    <div
+                        style="display: flex; flex-direction: column; gap: 10px"
+                    >
+                        <input
+                            type="text"
+                            id="eventName"
+                            placeholder="Event Name"
+                        />
+                        <div class="input-group">
+                            <input
+                                type="number"
+                                id="eventStock"
+                                value="10"
+                                placeholder="Qty"
+                            />
+                            <button
+                                class="btn-primary"
+                                onclick="app.deployEvent()"
+                            >
+                                Deploy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="section-header">02 // Target System</div>
+                    <div class="input-group">
+                        <select
+                            id="eventSelector"
+                            onchange="app.switchEvent()"
+                        ></select>
+                        <button class="btn-ghost" onclick="app.loadEvents()">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="section-header">03 // Consistency Strategy</div>
+                    <div class="mode-switch">
+                        <div
+                            class="mode-opt danger"
+                            id="modeNaive"
+                            onclick="app.setMode('naive')"
+                        >
+                            NAIVE
+                        </div>
+                        <div
+                            class="mode-opt safe active"
+                            id="modeAtomic"
+                            onclick="app.setMode('atomic')"
+                        >
+                            ATOMIC
+                        </div>
+                    </div>
+                    <div
+                        style="
+                            margin-top: 12px;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        "
+                    >
+                        <input
+                            type="checkbox"
+                            id="idempotencyCheck"
+                            checked
+                            style="width: auto"
+                        />
+                        <label
+                            for="idempotencyCheck"
+                            style="
+                                font-size: 0.8rem;
+                                color: var(--text-secondary);
+                                cursor: pointer;
+                            "
+                            >Enable Idempotency Lock</label
+                        >
+                    </div>
+                </div>
+
+                <div style="margin-top: auto">
+                    <div class="section-header">04 // Execution</div>
+                    <div style="display: flex; gap: 10px">
+                        <button
+                            class="btn-danger"
+                            style="flex: 1"
+                            onclick="app.resetEvent()"
+                        >
+                            Reset
+                        </button>
+                        <button
+                            class="btn-blast"
+                            style="flex: 2"
+                            onclick="app.launchAttack()"
+                        >
+                            <i class="fas fa-bolt"></i> BLAST
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="workspace">
+                <div
+                    style="
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 24px;
+                    "
+                >
+                    <div class="glass-panel">
+                        <div class="stat-row">
+                            <div>
+                                <div class="stat-label">LIVE INVENTORY</div>
+                                <div class="stat-value" id="liveStock">--</div>
+                            </div>
+                            <i
+                                class="fas fa-box"
+                                style="
+                                    font-size: 1.5rem;
+                                    color: var(--text-mono);
+                                    opacity: 0.3;
+                                "
+                            ></i>
+                        </div>
+                        <div
+                            class="stat-label"
+                            id="targetId"
+                            style="color: var(--text-mono)"
+                        >
+                            NO TARGET
+                        </div>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 0">
+                        <div
+                            style="
+                                padding: 24px 24px 0 24px;
+                                position: absolute;
+                                z-index: 10;
+                            "
+                        >
+                            <div class="stat-label">NETWORK LATENCY</div>
+                        </div>
+                        <canvas
+                            id="latencyChart"
+                            style="width: 100%; height: 100%"
+                        ></canvas>
+                    </div>
+                </div>
+
+                <div
+                    style="display: flex; flex-direction: column; min-height: 0"
+                >
+                    <div class="section-header">SYSTEM LOGS</div>
+                    <div class="terminal" id="console">
+                        <div class="log-entry">
+                            <span class="log-ts">INIT</span
+                            ><span class="log-msg"
+                                >Kernel loaded. Waiting for command...</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <script>
+            class OpsDashboard {
+                constructor() {
+                    this.apiBase = "http://localhost:8000/api/v1/buying";
+                    this.currentEventId = null;
+                    this.mode = "atomic";
+                    this.chart = null;
+
+                    this.initChart();
+                    this.loadEvents();
+
+                    // Start Polling
+                    setInterval(() => this.updateStock(), 800);
+                }
+
+                // --- UI HELPERS ---
+
+                log(msg, type = "") {
+                    const term = document.getElementById("console");
+                    const row = document.createElement("div");
+                    row.className = "log-entry";
+                    const ts = new Date().toLocaleTimeString("en-GB", {
+                        hour12: false,
+                    });
+                    row.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${type}">${msg}</span>`;
+                    term.prepend(row);
+                    if (term.children.length > 100) term.lastChild.remove();
+                }
+
+                // --- CHARTING ---
+
+                initChart() {
+                    const ctx = document
+                        .getElementById("latencyChart")
+                        .getContext("2d");
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                    gradient.addColorStop(0, "rgba(37, 99, 235, 0.4)");
+                    gradient.addColorStop(1, "rgba(37, 99, 235, 0)");
+
+                    this.chart = new Chart(ctx, {
+                        type: "line",
+                        data: {
+                            labels: Array(20).fill(""),
+                            datasets: [
+                                {
+                                    data: Array(20).fill(0),
+                                    borderColor: "#2563eb",
+                                    backgroundColor: gradient,
+                                    borderWidth: 2,
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointRadius: 0,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: false },
+                                y: { display: false, min: 0, max: 100 },
+                            },
+                            animation: false,
+                        },
+                    });
+                }
+
+                updateChart(val) {
+                    const d = this.chart.data.datasets[0].data;
+                    d.shift();
+                    d.push(val);
+                    this.chart.update();
+                }
+
+                // --- API METHODS ---
+
+                async loadEvents() {
+                    try {
+                        const res = await fetch(`${this.apiBase}/`);
+                        if (!res.ok) throw new Error("API Connection Failed");
+                        const events = await res.json();
+
+                        const sel = document.getElementById("eventSelector");
+                        sel.innerHTML = "";
+
+                        if (events.length === 0)
+                            sel.add(new Option("No Events Found", ""));
+                        else
+                            events.forEach((e) =>
+                                sel.add(new Option(e.name, e.id))
+                            );
+
+                        // Auto-select first if none selected
+                        if (!this.currentEventId && events.length > 0)
+                            this.currentEventId = events[0].id;
+                        if (this.currentEventId)
+                            sel.value = this.currentEventId;
+
+                        this.updateStock();
+                    } catch (e) {
+                        this.log("Error loading events: " + e.message, "err");
+                    }
+                }
+
+                async deployEvent() {
+                    const name = document.getElementById("eventName").value;
+                    const stock = document.getElementById("eventStock").value;
+
+                    if (!name) return this.log("Event name required", "err");
+
+                    try {
+                        const res = await fetch(`${this.apiBase}/`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                name,
+                                total_tickets: parseInt(stock),
+                                active: true,
+                            }),
+                        });
+
+                        if (res.ok) {
+                            this.log(`Deployed: ${name}`, "succ");
+                            this.loadEvents();
+                            document.getElementById("eventName").value = "";
+                        } else {
+                            this.log("Deployment failed", "err");
+                        }
+                    } catch (e) {
+                        this.log(e.message, "err");
+                    }
+                }
+
+                async updateStock() {
+                    if (!this.currentEventId) return;
+                    try {
+                        const res = await fetch(`${this.apiBase}/`, {
+                            cache: "no-store",
+                        });
+                        const events = await res.json();
+                        const ev = events.find(
+                            (e) => e.id == this.currentEventId
+                        );
+
+                        if (ev) {
+                            const el = document.getElementById("liveStock");
+                            el.innerText = ev.tickets_left;
+                            el.style.color =
+                                ev.tickets_left <= 0
+                                    ? "var(--danger)"
+                                    : "var(--text-primary)";
+                            document.getElementById(
+                                "targetId"
+                            ).innerText = `ID: ${
+                                ev.id
+                            } // ${ev.name.toUpperCase()}`;
+                        }
+                    } catch (e) {}
+                }
+
+                switchEvent() {
+                    this.currentEventId =
+                        document.getElementById("eventSelector").value;
+                    this.updateStock();
+                }
+
+                setMode(m) {
+                    this.mode = m;
+                    document.getElementById(
+                        "modeNaive"
+                    ).className = `mode-opt danger ${
+                        m === "naive" ? "active" : ""
+                    }`;
+                    document.getElementById(
+                        "modeAtomic"
+                    ).className = `mode-opt safe ${
+                        m === "atomic" ? "active" : ""
+                    }`;
+                    this.log(`Strategy switched: ${m.toUpperCase()}`);
+                }
+
+                async resetEvent() {
+                    if (!this.currentEventId) return;
+                    await fetch(
+                        `${this.apiBase}/reset/${this.currentEventId}`,
+                        { method: "POST" }
+                    );
+                    this.log("System state reset", "succ");
+                    this.updateStock();
+                    this.updateChart(0);
+                }
+
+                // --- THE ATTACK LOGIC ---
+
+                async launchAttack() {
+                    if (!this.currentEventId)
+                        return this.log("Select a target first", "err");
+
+                    const count = 100;
+                    const useIdem =
+                        document.getElementById("idempotencyCheck").checked;
+
+                    this.log(
+                        `Initiating load test: ${count} concurrent reqs...`
+                    );
+
+                    const requests = [];
+                    const baseId = `blast-${Date.now()}`;
+
+                    for (let i = 0; i < count; i++) {
+                        const headers = { "Content-Type": "application/json" };
+
+                        // Unique Idempotency Key per request to simulate unique users
+                        // (If we used the same key, Redis would block all but the first one correctly!)
+                        if (useIdem)
+                            headers[
+                                "X-Idempotency-Key"
+                            ] = `${baseId}-${i}-${Math.random()}`;
+
+                        const endpoint =
+                            this.mode === "naive" ? "naive-buy" : "atomic-buy";
+
+                        // We use fetch without await to fire them off in parallel
+                        requests.push(
+                            fetch(
+                                `${this.apiBase}/${endpoint}/${this.currentEventId}`,
+                                {
+                                    method: "POST",
+                                    headers: headers,
+                                    cache: "no-store",
+                                }
+                            )
+                                .then((r) => (r.ok ? 1 : 0))
+                                .catch(() => -1) // -1 network error
+                        );
+                    }
+
+                    // Visual FX
+                    let load = 0;
+                    const interval = setInterval(() => {
+                        load += 20;
+                        this.updateChart(Math.random() * 80 + 20);
+                        if (load >= 100) clearInterval(interval);
+                    }, 50);
+
+                    // Wait for all to settle
+                    const results = await Promise.all(requests);
+
+                    const success = results.filter((r) => r === 1).length;
+                    const fail = results.filter((r) => r === 0).length;
+
+                    if (success > 10) {
+                        this.log(
+                            `CRITICAL FAILURE: Sold ${success} tickets!`,
+                            "err"
+                        );
+                    } else {
+                        this.log(
+                            `SUCCESS: Processed ${success} valid orders.`,
+                            "succ"
+                        );
+                    }
+
+                    this.updateStock();
+                    setTimeout(() => this.updateChart(0), 1000);
+                }
+            }
+
+            // Initialize App
+            const app = new OpsDashboard();
+        </script>
+    </body>
+</html>
