@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from src.routes import buying_router
 from contextlib import asynccontextmanager
 from src.redis.client import redis_manager
@@ -17,6 +18,9 @@ app = FastAPI(
     description="A flash-sale system that handles 1,000 concurrent requests for 10 tickets with zero race conditions or overselling",
     version=version
 )
+
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
+
 
 app.include_router(buying_router, prefix=f"/api/{version}/buying", tags=["buying"])
 
